@@ -742,6 +742,94 @@ legend{font-size:14px;font-weight:750;margin-bottom:10px}
   .stage-sel{grid-column:auto}
 }
 
+
+
+/* ===== v4.1 · Mobile form polish / progressive disclosure ===== */
+@media(max-width:820px){
+  .sheet{
+    scroll-padding-top:82px;
+    scroll-padding-bottom:calc(96px + var(--safe-bottom));
+  }
+  .sheet>header{
+    z-index:20;
+    border-bottom:1px solid var(--g-line);
+    box-shadow:0 1px 0 rgba(56,26,16,.02);
+  }
+  #pf{padding-top:8px;padding-bottom:calc(24px + var(--safe-bottom))}
+
+  /* Zone photo : plus compacte et lisible */
+  .ph{
+    flex-wrap:nowrap;align-items:center;gap:12px;
+    margin:10px 0 4px;padding:12px;
+    background:#fff;border:1px solid var(--g-line);border-radius:14px;
+  }
+  .ph .av{width:64px!important;height:64px!important;min-width:64px}
+  .ph-act{flex:1;min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+  .ph-act .btn{width:100%;min-width:0;white-space:nowrap}
+  .ph-act .link{align-self:center;white-space:nowrap}
+  .ph-act .link[hidden]{display:none!important}
+
+  /* Le formulaire doit se lire comme des blocs, pas comme une feuille desktop infinie */
+  fieldset{margin-top:18px}
+  legend{font-size:16px;letter-spacing:-.01em;margin-bottom:10px}
+  .grid{gap:12px}
+  .f{gap:6px}
+  .f label{font-size:13px;line-height:1.25;color:#776A64}
+  .note{font-size:13px;line-height:1.45;padding:11px 12px;border-radius:11px}
+
+  /* Progressive disclosure : tant qu'il n'y a pas de consentement, pas de faux champs gris inutiles */
+  #conv.off .grid{display:none!important}
+  #conv.off .note{margin-bottom:0}
+  .mobile-hidden{display:none!important}
+
+  /* Dates/heures iOS : ne pas afficher la date du jour comme si elle avait été saisie */
+  .picker-wrap{position:relative;width:100%}
+  .picker-wrap::after{
+    content:attr(data-placeholder);
+    position:absolute;left:12px;right:40px;top:50%;transform:translateY(-50%);
+    color:#A99D97;font-size:16px;line-height:1.2;pointer-events:none;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .picker-wrap:not(.is-empty)::after,.picker-wrap:focus-within::after{display:none}
+  .picker-wrap.is-empty input{color:transparent!important}
+  .picker-wrap.is-empty input:focus{color:var(--g-text)!important}
+  .picker-wrap.is-empty input::-webkit-datetime-edit,
+  .picker-wrap.is-empty input::-webkit-date-and-time-value{color:transparent!important}
+  .picker-wrap input[type="date"],.picker-wrap input[type="time"]{text-align:left}
+  .picker-wrap input::-webkit-date-and-time-value{text-align:left}
+
+  /* CTA : aucune information ne doit passer derrière les boutons */
+  .form-foot{
+    z-index:18;
+    margin-top:22px;margin-left:-14px;margin-right:-14px;
+    padding:10px 14px calc(10px + var(--safe-bottom));
+    background:rgba(251,250,248,.97);
+    -webkit-backdrop-filter:blur(18px) saturate(150%);
+    backdrop-filter:blur(18px) saturate(150%);
+    border-top:1px solid var(--g-line);
+    box-shadow:0 -10px 28px rgba(56,26,16,.08);
+  }
+  .form-foot .btn{min-height:48px}
+}
+
+@media(max-width:390px){
+  .ph{align-items:flex-start}
+  .ph-act{grid-template-columns:1fr}
+  .ph-act .link{justify-self:start;min-height:32px;display:flex;align-items:center}
+}
+
+/* ===== v4.2 · Mobile information architecture ===== */
+@media(max-width:820px){
+  #pf{display:flex;flex-direction:column}
+  #pf>.ph{order:0}
+  #identityFs{order:1}
+  #contactFs{order:2}
+  #consentFs{order:3}
+  #conv{order:4}
+  #suiviFs{order:5}
+  #productionFs{order:6}
+  #pf>.form-foot{order:99}
+}
 </style>
 </head>
 <body>
@@ -1529,43 +1617,57 @@ async function sendMail(ev){
 }
 
 /* ---------- Formulaire profil ---------- */
-function F(name,label,val,type,o){o=o||{};return `<div class="f${o.full?' full':''}"${o.wrap?` id="${o.wrap}"`:''}><label for="f_${name}">${label}</label><input id="f_${name}" name="${name}" type="${type||'text'}" value="${esc(val)}"${o.attrs?' '+o.attrs:''}></div>`;}
-function Sel(name,label,opts,val,o){o=o||{};return `<div class="f${o.full?' full':''}"><label for="f_${name}">${label}</label><select id="f_${name}" name="${name}"${o.attrs?' '+o.attrs:''}>${o.noEmpty?'':'<option value=""></option>'}${Object.entries(opts).map(([k,l])=>`<option value="${k}"${k===val?' selected':''}>${esc(l)}</option>`).join('')}</select></div>`;}
-function TA(name,label,val){return `<div class="f full"><label for="f_${name}">${label}</label><textarea id="f_${name}" name="${name}" rows="4">${esc(val)}</textarea></div>`;}
+function F(name,label,val,type,o){
+  o=o||{};type=type||'text';
+  const picker=type==='date'||type==='time';
+  const wrapId=o.wrap?` id="${o.wrap}"`:'';
+  const ph=type==='date'?'Sélectionner une date':'Sélectionner une heure';
+  const input=`<input id="f_${name}" name="${name}" type="${type}" value="${esc(val)}"${o.attrs?' '+o.attrs:''}>`;
+  return `<div class="f${o.full?' full':''}"${wrapId} data-field="${name}"><label for="f_${name}">${label}</label>${picker?`<div class="picker-wrap" data-placeholder="${ph}">${input}</div>`:input}</div>`;
+}
+function Sel(name,label,opts,val,o){o=o||{};return `<div class="f${o.full?' full':''}" data-field="${name}"><label for="f_${name}">${label}</label><select id="f_${name}" name="${name}"${o.attrs?' '+o.attrs:''}>${o.noEmpty?'':'<option value=""></option>'}${Object.entries(opts).map(([k,l])=>`<option value="${k}"${k===val?' selected':''}>${esc(l)}</option>`).join('')}</select></div>`;}
+function TA(name,label,val){return `<div class="f full" data-field="${name}"><label for="f_${name}">${label}</label><textarea id="f_${name}" name="${name}" rows="4">${esc(val)}</textarea></div>`;}
 
 function openForm(id){
   const p=id?{...byId(id)}:{etape:'contact',consentement:'non'};
   S.editing=id||null;S.formPhoto=id?(p.photo||'__KEEP__'):'';
   const m=$('#modal');
+  const hasPhoto=!!(p.photo&&String(p.photo).startsWith('data:'));
   m.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ft">
   <header><h2 id="ft">${id?'Modifier la fiche':'Nouveau profil'}</h2><button class="x" onclick="closeForm()" aria-label="Fermer">×</button></header>
   <form id="pf" onsubmit="saveForm(event)" novalidate>
-    <div class="ph"><span id="phPrev">${avatar(p,76)}</span><div class="ph-act"><label class="btn ghost" tabindex="0" onkeydown="if(event.key==='Enter')this.querySelector('input').click()">Choisir une photo<input type="file" accept="image/*" hidden onchange="pickPhoto(this)"></label><button type="button" class="link" onclick="clearPhoto()">Retirer la photo</button></div></div>
-    <fieldset><legend>Identité</legend><div class="grid">
+    <div class="ph"><span id="phPrev">${avatar(p,76)}</span><div class="ph-act"><label class="btn ghost" tabindex="0" onkeydown="if(event.key==='Enter')this.querySelector('input').click()">Choisir une photo<input type="file" accept="image/*" hidden onchange="pickPhoto(this)"></label><button id="removePhoto" type="button" class="link" onclick="clearPhoto()"${hasPhoto?'':' hidden'}>Retirer</button></div></div>
+
+    <fieldset id="identityFs"><legend>Identité</legend><div class="grid">
       ${F('prenom','Prénom',p.prenom,'text',{attrs:'autocomplete="off"'})}${F('nom','Nom',p.nom,'text',{attrs:'autocomplete="off"'})}
       ${Sel('sexe','Sexe',SEXES,p.sexe)}${F('dateNaissance','Date de naissance',p.dateNaissance,'date')}
       ${F('nationalite','Nationalité',p.nationalite)}${F('ville','Ville',p.ville)}
     </div></fieldset>
-    <fieldset><legend>Consentement</legend>
+
+    <fieldset id="consentFs"><legend>Consentement</legend>
       ${p.consentement==='retire'?'<p class="note">Cette personne a retiré son consentement. Ne le recoche que si elle a signé un nouvel accord.</p>':''}
       <label class="check"><input type="checkbox" name="consentement" value="oui"${p.consentement==='oui'?' checked':''} onchange="toggleConv()"><span>Consentement écrit recueilli pour la conservation de ces données et leur usage dans le cadre du podcast</span></label>
-      <div class="grid" style="margin-top:12px">${F('dateConsentement','Date du consentement',p.dateConsentement,'date')}</div>
+      <div class="grid" style="margin-top:12px">${F('dateConsentement','Date du consentement',p.dateConsentement,'date',{wrap:'dateConsentWrap'})}</div>
     </fieldset>
+
     <fieldset id="conv"><legend>Conversion</legend>
-      <p class="note" id="convNote">Ces champs se débloquent une fois le consentement coché. Le parcours religieux est une donnée sensible (RGPD, article 9).</p>
+      <p class="note" id="convNote">Ces informations apparaissent après consentement. Le parcours religieux est une donnée sensible (RGPD, article 9).</p>
       <div class="grid">
         ${Sel('courant','Courant',COURANTS,p.courant,{attrs:'onchange="toggleConv()"'})}${F('courantAutre','Précise le courant',p.courantAutre,'text',{wrap:'autreWrap'})}
         ${Sel('statutConversion','Statut',STATUTS,p.statutConversion)}${F('dateConversion','Date de conversion',p.dateConversion,'date')}
         ${F('beitDin','Beit din ou rabbin référent',p.beitDin,'text',{full:true})}
       </div></fieldset>
-    <fieldset><legend>Contact</legend><div class="grid">${F('telephone','Téléphone',p.telephone,'tel')}${F('email','Mail',p.email,'email')}</div></fieldset>
-    <fieldset><legend>Suivi</legend><div class="grid">
+
+    <fieldset id="contactFs"><legend>Contact</legend><div class="grid">${F('telephone','Téléphone',p.telephone,'tel')}${F('email','Mail',p.email,'email')}</div></fieldset>
+
+    <fieldset id="suiviFs"><legend>Suivi</legend><div class="grid">
       ${Sel('etape','Étape',STAGE_OBJ,p.etape||'contact',{noEmpty:true,attrs:'onchange="toggleConv()"'})}${Sel('source','Source',SOURCES,p.source)}
       ${F('motifNonRetenu','Motif de non-sélection',p.motifNonRetenu,'text',{full:true,wrap:'motifWrap'})}
       ${F('tags','Tags, séparés par des virgules',p.tags,'text',{full:true})}
       ${TA('notes','Notes',p.notes)}
     </div></fieldset>
-    <fieldset><legend>Production</legend><div class="grid">
+
+    <fieldset id="productionFs"><legend>Production</legend><div class="grid">
       ${F('datePreEntretien','Pré-entretien',p.datePreEntretien,'date')}${F('heurePreEntretien','Heure du pré-entretien',p.heurePreEntretien,'time')}
       ${F('dateEnregistrement','Enregistrement',p.dateEnregistrement,'date')}${F('heureEnregistrement',"Heure de l'enregistrement",p.heureEnregistrement,'time')}
       ${F('lieuEnregistrement',"Lieu d'enregistrement",p.lieuEnregistrement)}${F('numeroEpisode',"Numéro d'épisode",p.numeroEpisode)}
@@ -1577,34 +1679,46 @@ function openForm(id){
     <div class="form-foot"><button type="button" class="btn ghost" onclick="closeForm()">Annuler</button><button class="btn" type="submit">${id?'Enregistrer':'Créer le profil'}</button></div>
   </form></div>`;
   m.hidden=false;document.body.style.overflow='hidden';
+  bindNativePickers();
   toggleConv();
-  setTimeout(()=>$('#f_prenom').focus(),50);
+  if(window.matchMedia('(min-width:821px)').matches)setTimeout(()=>$('#f_prenom')?.focus(),50);
 }
 function closeForm(){$('#modal').hidden=true;$('#modal').innerHTML='';document.body.style.overflow='';S.editing=null;S.mailPid=null;}
+function bindNativePickers(){
+  document.querySelectorAll('#pf .picker-wrap').forEach(w=>{
+    const input=w.querySelector('input');if(!input)return;
+    const sync=()=>w.classList.toggle('is-empty',!input.value);
+    sync();input.addEventListener('input',sync);input.addEventListener('change',sync);
+  });
+}
 function toggleConv(){
   const fm=$('#pf');if(!fm)return;
   const on=fm.elements.consentement.checked,fs=$('#conv');
-  fs.disabled=!on;fs.classList.toggle('off',!on);$('#convNote').hidden=on;
+  fs.disabled=!on;fs.classList.toggle('off',!on);fs.classList.toggle('mobile-hidden',!on);$('#convNote').hidden=on;
+  const dc=$('#dateConsentWrap');if(dc)dc.classList.toggle('mobile-hidden',!on);
   $('#autreWrap').hidden=fm.elements.courant.value!=='autre';
   $('#motifWrap').hidden=fm.elements.etape.value!=='nonretenu';
-  if(on&&!fm.elements.dateConsentement.value)fm.elements.dateConsentement.value=today();
-}
-function resizeImage(file){
-  return new Promise((res,rej)=>{
-    const r=new FileReader();
-    r.onerror=rej;
-    r.onload=()=>{const img=new Image();img.onerror=rej;img.onload=()=>{
-      const SZ=200,c=document.createElement('canvas'),s=Math.min(img.width,img.height);
-      c.width=c.height=SZ;c.getContext('2d').drawImage(img,(img.width-s)/2,(img.height-s)/2,s,s,0,0,SZ,SZ);
-      let q=.85,out=c.toDataURL('image/jpeg',q);
-      while(out.length>44000&&q>.3){q-=.08;out=c.toDataURL('image/jpeg',q);}
-      res(out);};img.src=r.result;};
-    r.readAsDataURL(file);
+  if(on&&!fm.elements.dateConsentement.value){fm.elements.dateConsentement.value=today();const w=fm.elements.dateConsentement.closest('.picker-wrap');if(w)w.classList.remove('is-empty');}
+
+  /* Sur mobile, les champs de production apparaissent au moment où ils deviennent utiles. */
+  const ranks={contact:0,preentretien:1,retenu:2,planifie:3,enregistre:4,diffuse:5,publie:6,nonretenu:-1};
+  const rank=ranks[fm.elements.etape.value]??0;
+  const production=$('#productionFs');
+  if(production)production.classList.toggle('mobile-hidden',rank<1);
+  const rules={
+    datePreEntretien:1,heurePreEntretien:1,
+    dateEnregistrement:3,heureEnregistrement:3,lieuEnregistrement:3,
+    numeroEpisode:4,titreEpisode:4,
+    dateDiffusionRadio:5,
+    dateMiseEnLigne:6,lienEpisode:6
+  };
+  Object.entries(rules).forEach(([name,min])=>{
+    const el=fm.querySelector(`[data-field="${name}"]`);if(el)el.classList.toggle('mobile-hidden',rank<min);
   });
 }
-async function pickPhoto(input){const f=input.files&&input.files[0];if(!f)return;try{S.formPhoto=await resizeImage(f);updPh();}catch(e){toast('Image illisible. Choisis un fichier JPG ou PNG.',true);}}
+async function pickPhoto(input){const f=input.files&&input.files[0];if(!f)return;try{S.formPhoto=await resizeImage(f);updPh();const b=$('#removePhoto');if(b)b.hidden=false;}catch(e){toast('Image illisible. Choisis un fichier JPG ou PNG.',true);}}
 function updPh(){const fm=$('#pf');$('#phPrev').innerHTML=avatar({photo:S.formPhoto,prenom:fm.elements.prenom.value,nom:fm.elements.nom.value},76);}
-function clearPhoto(){S.formPhoto='';updPh();}
+function clearPhoto(){S.formPhoto='';updPh();const b=$('#removePhoto');if(b)b.hidden=true;}
 async function saveForm(ev){
   ev.preventDefault();
   const fm=ev.target,btn=fm.querySelector('button[type=submit]');
