@@ -10,8 +10,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="robots" content="noindex, nofollow">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 
 <title>Guérim CRM</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -497,6 +497,10 @@ legend{font-size:14px;font-weight:750;margin-bottom:10px}
 .eye svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7}
 #pwf input{border:1px solid #E5DED8;background:#fff;border-radius:9px;padding:9px 10px;min-height:38px;width:100%;outline:none}
 .u-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+/* v3.8 : rester connecté */
+.login-card .remember{font-size:13px;align-items:flex-start;margin-top:2px}
+.login-card .remember input{width:18px;height:18px;padding:0;margin-top:2px;accent-color:#381A10;flex:none}
+.login-card .remember small{display:block;color:var(--g-muted);font-size:11.5px;margin-top:2px}
 *:focus-visible{outline:2px solid #A77E62;outline-offset:2px}
 
 @media(min-width:821px){.demo{top:auto;bottom:16px;right:16px}}
@@ -584,6 +588,8 @@ function remote(fn,a){
 const PUBLIC_API=['api_status','api_login','api_setup','api_forgot','api_resetWithCode'];
 const TOKEN_KEY='guerim_crm_session';
 function storeToken(t){S.token=t||'';try{t?localStorage.setItem(TOKEN_KEY,t):localStorage.removeItem(TOKEN_KEY);}catch(e){}}
+function storedRemember(){try{return localStorage.getItem(TOKEN_KEY+'_30j')==='1';}catch(e){return false;}}
+function storeRemember(v){try{v?localStorage.setItem(TOKEN_KEY+'_30j','1'):localStorage.removeItem(TOKEN_KEY+'_30j');}catch(e){}}
 function storedToken(){try{return localStorage.getItem(TOKEN_KEY)||'';}catch(e){return '';}}
 function call(fn,...args){
   const a=PUBLIC_API.includes(fn)?args:[S.token,...args];
@@ -915,6 +921,7 @@ function showLogin(notice){
     <div class="f"><label for="l_login">Identifiant</label><input id="l_login" name="login" autocomplete="username" autocapitalize="none" placeholder="${setup?'caroline':''}"></div>
     <div class="f"><label for="l_pwd">Mot de passe${setup?', 10 caractères minimum':''}</label>${pw('l_pwd','pwd',setup?'new-password':'current-password')}</div>
     ${setup?`<div class="f"><label for="l_pwd2">Confirmation</label>${pw('l_pwd2','pwd2','new-password')}</div>`:''}
+    ${setup?'':`<label class="check remember"><input type="checkbox" name="remember"${storedRemember()?' checked':''}><span>Rester connecté sur cet appareil pendant 30 jours<small>À cocher uniquement sur un appareil personnel, protégé par un code de verrouillage.</small></span></label>`}
     <button class="btn" type="submit">${setup?'Créer et entrer':'Se connecter'}</button>
     ${setup?'':'<button class="link" type="button" onclick="showForgot()" style="align-self:center">Mot de passe oublié ?</button>'}
     ${isGAS||isRemote?'':'<p class="hint">Mode démo : identifiant « caroline », mot de passe « demo ». Code de réinitialisation : 123456.</p>'}
@@ -996,7 +1003,8 @@ async function doLogin(ev){
   if(!el.login.value.trim()){el.login.focus();return;}
   if(!el.pwd.value){el.pwd.focus();return;}
   busy(btn,true,'Connexion…');
-  try{const r=await call('api_login',el.login.value.trim().toLowerCase(),el.pwd.value);storeToken(r.token);if(r.mustChange){showChoosePwd(el.pwd.value);return;}btn.textContent='Ouverture…';await enter();}
+  const remember=!!(el.remember&&el.remember.checked);storeRemember(remember);
+  try{const r=await call('api_login',el.login.value.trim().toLowerCase(),el.pwd.value,remember);storeToken(r.token);if(r.mustChange){showChoosePwd(el.pwd.value);return;}btn.textContent='Ouverture…';await enter();}
   catch(e){busy(btn,false);el.pwd.value='';el.pwd.focus();toast(msg(e),true);}
 }
 async function doSetup(ev){
