@@ -617,6 +617,17 @@ legend{font-size:14px;font-weight:750;margin-bottom:10px}
   .hero-act,.head-actions{grid-template-columns:1fr}
 }
 
+
+/* v3.10 : champs date et heure sur iPhone */
+/* Safari iOS donne aux champs date/heure une largeur minimale propre : ils ignorent width:100 % et dépassent à droite. */
+input[type=date],input[type=time]{display:block;min-width:0;max-width:100%;width:100%;box-sizing:border-box}
+@supports (-webkit-touch-callout:none){
+  /* iOS uniquement : apparence neutre, texte aligné à gauche, icône pour signaler un sélecteur (iOS n'en affiche pas) */
+  input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;text-align:left;padding-right:44px!important;background-repeat:no-repeat;background-position:right 14px center;background-size:20px}
+  input[type=date]{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23796B65' stroke-width='1.7'%3E%3Cpath d='M7 3v3m10-3v3M4.5 9h15M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z'/%3E%3C/svg%3E")}
+  input[type=time]{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23796B65' stroke-width='1.7'%3E%3Ccircle cx='12' cy='12' r='8.5'/%3E%3Cpath d='M12 7.5V12l3 2'/%3E%3C/svg%3E")}
+  input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and-time-value{text-align:left;min-height:1.3em}
+}
 *:focus-visible{outline:2px solid #A77E62;outline-offset:2px}
 
 @media(min-width:821px){.demo{top:auto;bottom:16px;right:16px}}
@@ -1419,7 +1430,7 @@ function openForm(id){
   m.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ft">
   <header><h2 id="ft">${id?'Modifier la fiche':'Nouveau profil'}</h2><button class="x" onclick="closeForm()" aria-label="Fermer">×</button></header>
   <form id="pf" onsubmit="saveForm(event)" novalidate>
-    <div class="ph"><span id="phPrev">${avatar(p,76)}</span><div class="ph-act"><label class="btn ghost" tabindex="0" onkeydown="if(event.key==='Enter')this.querySelector('input').click()">Choisir une photo<input type="file" accept="image/*" hidden onchange="pickPhoto(this)"></label><button type="button" class="link" onclick="clearPhoto()">Retirer la photo</button></div></div>
+    <div class="ph"><span id="phPrev">${avatar(p,76)}</span><div class="ph-act"><label class="btn ghost" tabindex="0" onkeydown="if(event.key==='Enter')this.querySelector('input').click()">Choisir une photo<input type="file" accept="image/*" hidden onchange="pickPhoto(this)"></label><button type="button" id="rmPhoto" class="link" onclick="clearPhoto()">Retirer la photo</button></div></div>
     <fieldset id="identityFs"><legend>Identité</legend><div class="grid">
       ${F('prenom','Prénom',p.prenom,'text',{attrs:'autocomplete="off"'})}${F('nom','Nom',p.nom,'text',{attrs:'autocomplete="off"'})}
       ${Sel('sexe','Sexe',SEXES,p.sexe)}${F('dateNaissance','Date de naissance',p.dateNaissance,'date')}
@@ -1457,6 +1468,8 @@ function openForm(id){
   </form></div>`;
   m.hidden=false;document.body.style.overflow='hidden';document.body.classList.add('modal-open');
   toggleConv();
+  updPh();
+  ['prenom','nom'].forEach(n=>$('#pf').elements[n].addEventListener('input',()=>{if(!(S.formPhoto&&S.formPhoto.startsWith('data:')))updPh();}));
   if(window.matchMedia('(min-width:821px)').matches)setTimeout(()=>$('#f_prenom').focus(),50);
 }
 function closeForm(){$('#modal').hidden=true;$('#modal').innerHTML='';document.body.style.overflow='';document.body.classList.remove('modal-open');S.editing=null;S.mailPid=null;}
@@ -1482,7 +1495,11 @@ function resizeImage(file){
   });
 }
 async function pickPhoto(input){const f=input.files&&input.files[0];if(!f)return;try{S.formPhoto=await resizeImage(f);updPh();}catch(e){toast('Image illisible. Choisis un fichier JPG ou PNG.',true);}}
-function updPh(){const fm=$('#pf');$('#phPrev').innerHTML=avatar({photo:S.formPhoto,prenom:fm.elements.prenom.value,nom:fm.elements.nom.value},76);}
+function updPh(){
+  const fm=$('#pf');if(!fm)return;
+  $('#phPrev').innerHTML=avatar({photo:S.formPhoto,prenom:fm.elements.prenom.value,nom:fm.elements.nom.value},76);
+  const rm=$('#rmPhoto');if(rm)rm.hidden=!(S.formPhoto&&S.formPhoto.startsWith('data:'));
+}
 function clearPhoto(){S.formPhoto='';updPh();}
 async function saveForm(ev){
   ev.preventDefault();
