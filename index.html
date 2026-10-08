@@ -830,6 +830,190 @@ legend{font-size:14px;font-weight:750;margin-bottom:10px}
   #productionFs{order:6}
   #pf>.form-foot{order:99}
 }
+
+
+/* ===== v5.0 · Mobile app shell / UX hardening ===== */
+@media(max-width:820px){
+  :root{
+    --tabbar-core-h:64px;
+    --mobile-page-x:14px;
+  }
+
+  html,body{width:100%;max-width:100%;overflow-x:hidden}
+  body{padding:0!important}
+
+  /* APP SHELL — hauteur de tab bar verrouillée. */
+  .side{
+    position:fixed!important;
+    left:0!important;right:0!important;bottom:0!important;top:auto!important;
+    width:100%!important;
+    height:calc(var(--tabbar-core-h) + var(--safe-bottom))!important;
+    min-height:0!important;
+    max-height:calc(var(--tabbar-core-h) + var(--safe-bottom))!important;
+    padding:4px max(6px,var(--safe-right)) var(--safe-bottom) max(6px,var(--safe-left))!important;
+    display:block!important;
+    overflow:hidden!important;
+    background:#32170f!important;
+    border-top:1px solid rgba(255,255,255,.08)!important;
+    box-shadow:0 -8px 28px rgba(39,21,15,.08)!important;
+  }
+  #nav{
+    width:100%!important;height:60px!important;min-height:60px!important;
+    display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;
+    grid-auto-flow:unset!important;grid-auto-columns:unset!important;
+    gap:2px!important;align-items:center!important;
+  }
+  #nav button{
+    width:100%!important;height:56px!important;min-height:56px!important;max-height:56px!important;
+    min-width:0!important;padding:4px 2px!important;margin:0!important;
+    display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;
+    gap:3px!important;border-radius:12px!important;
+    font-size:10px!important;line-height:1!important;font-weight:600!important;
+    overflow:hidden!important;white-space:nowrap!important;
+  }
+  #nav button svg{width:20px!important;height:20px!important;flex:0 0 20px!important}
+  #nav button span{display:block!important;max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important}
+  #nav button.on{background:rgba(226,203,175,.17)!important}
+  .brand,.brand-lockup,.ver,.nav-label{display:none!important}
+  .side-foot{position:absolute!important;inset:0!important;pointer-events:none!important;margin:0!important}
+  .side-foot .btn-new{pointer-events:auto}
+
+  .workspace{
+    padding-bottom:calc(var(--tabbar-core-h) + var(--safe-bottom))!important;
+    min-height:100dvh!important;
+  }
+  main{
+    padding:18px var(--mobile-page-x) calc(28px + var(--tabbar-core-h) + var(--safe-bottom))!important;
+  }
+
+  /* Dashboard — densité premium, aucune collision avec le FAB. */
+  .topbar{
+    min-height:58px!important;
+    padding:8px var(--mobile-page-x)!important;
+  }
+  .topbar-search{height:46px!important;border-radius:14px!important}
+  .page-h{margin-bottom:16px!important;gap:12px!important}
+  .page-h h1{font-size:30px!important}
+  .page-h .date{font-size:14px!important;margin-top:6px!important}
+  .head-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;width:100%!important}
+  .head-actions .btn{width:100%!important;min-height:48px!important}
+  .strip{
+    display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;margin:0 0 14px!important;padding:0!important;
+    overflow:visible!important;background:transparent!important;
+  }
+  .strip button{
+    width:100%!important;min-width:0!important;min-height:78px!important;
+    padding:13px 14px!important;border-radius:14px!important;
+    background:#fff!important;border:1px solid var(--g-line)!important;
+    box-shadow:0 1px 2px rgba(42,28,20,.03)!important;
+  }
+  .strip-n{font-size:24px!important}.strip-l{font-size:12px!important}
+  .dash{gap:12px!important}
+  .panel{padding:16px!important;border-radius:15px!important}
+  .panel h2{font-size:16px!important;margin-bottom:12px!important}
+
+  /* FAB : utile hors accueil seulement. */
+  .btn-new{
+    right:calc(14px + var(--safe-right))!important;
+    bottom:calc(var(--tabbar-core-h) + 14px + var(--safe-bottom))!important;
+    width:50px!important;height:50px!important;min-height:50px!important;
+    box-shadow:0 10px 28px rgba(42,23,16,.20)!important;
+  }
+  body[data-view="accueil"] .btn-new{display:none!important}
+
+  /* FORM SHEET — vrai écran mobile, pas de CTA flottant sur le contenu. */
+  .modal{z-index:100!important;background:#fbfaf8!important;overflow:hidden!important}
+  .sheet{
+    width:100%!important;height:100dvh!important;max-height:100dvh!important;
+    display:flex!important;flex-direction:column!important;
+    overflow:hidden!important;padding:0!important;background:#fbfaf8!important;
+  }
+  .sheet>header{
+    position:relative!important;top:auto!important;flex:0 0 auto!important;
+    min-height:72px!important;
+    padding:calc(12px + var(--safe-top)) 16px 12px!important;
+    display:flex!important;align-items:center!important;
+    background:#fbfaf8!important;border-bottom:1px solid var(--g-line)!important;
+    box-shadow:none!important;
+  }
+  .sheet>header h2{font-size:22px!important;line-height:1.15!important}
+  .sheet>header .x{margin-left:auto!important;flex:0 0 44px!important}
+
+  #pf,#mf{
+    flex:1 1 auto!important;
+    min-height:0!important;
+    overflow-y:auto!important;
+    -webkit-overflow-scrolling:touch!important;
+    overscroll-behavior-y:contain!important;
+    padding:14px 14px calc(24px + var(--safe-bottom))!important;
+    scroll-padding-top:18px!important;scroll-padding-bottom:24px!important;
+  }
+
+  /* Le footer revient dans le flux : impossible qu'il masque un champ. */
+  #pf>.form-foot,#mf>.form-foot,.form-foot{
+    position:static!important;
+    inset:auto!important;
+    width:auto!important;
+    margin:24px 0 0!important;
+    padding:16px 0 4px!important;
+    display:grid!important;grid-template-columns:minmax(0,.9fr) minmax(0,1.15fr)!important;
+    gap:10px!important;
+    background:transparent!important;
+    border-top:1px solid var(--g-line)!important;
+    box-shadow:none!important;
+    backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+  }
+  .form-foot .btn{width:100%!important;min-height:50px!important;border-radius:13px!important}
+
+  /* Photo — compacte. */
+  .ph{
+    display:grid!important;grid-template-columns:64px minmax(0,1fr)!important;
+    align-items:center!important;gap:12px!important;
+    margin:0 0 22px!important;padding:0!important;
+    background:transparent!important;border:0!important;border-radius:0!important;
+  }
+  .ph .av{width:64px!important;height:64px!important;min-width:64px!important}
+  .ph-act{display:flex!important;align-items:center!important;gap:10px!important;min-width:0!important;flex-wrap:wrap!important}
+  .ph-act .btn{width:auto!important;min-height:44px!important;padding:9px 13px!important}
+  .ph-act .link{font-size:13px!important;min-height:36px!important;display:inline-flex!important;align-items:center!important}
+  .ph-act .link[hidden]{display:none!important}
+
+  /* Sections du formulaire : rythme, pas de gigantesques trous. */
+  fieldset{margin:0 0 24px!important;padding:0!important}
+  fieldset:last-of-type{margin-bottom:0!important}
+  legend{font-size:17px!important;line-height:1.2!important;margin:0 0 14px!important}
+  .grid,.u-grid{grid-template-columns:1fr!important;gap:13px!important}
+  .f{gap:6px!important}
+  .f label{font-size:13px!important;line-height:1.2!important;font-weight:600!important;color:#776a64!important}
+  .f input,.f select,.f textarea,
+  #pf input,#pf select,#pf textarea,
+  #mf input,#mf select,#mf textarea{
+    min-height:50px!important;font-size:16px!important;border-radius:13px!important;padding:11px 12px!important;
+  }
+  #pf textarea,#mf textarea{min-height:112px!important}
+  .check{min-height:0!important;padding:2px 0!important;gap:10px!important;font-size:14px!important;line-height:1.45!important}
+  .check input,#pf .check input{width:21px!important;height:21px!important;min-height:21px!important;flex:0 0 21px!important;margin-top:1px!important}
+  .note{margin:0 0 12px!important;padding:12px 13px!important;font-size:13px!important;line-height:1.45!important;border-radius:12px!important}
+
+  /* Dashboard/listes : pas d'éléments qui sortent sous la tab bar. */
+  .toast,.demo{bottom:calc(var(--tabbar-core-h) + 12px + var(--safe-bottom))!important}
+}
+
+@media(max-width:430px){
+  :root{--mobile-page-x:13px}
+  #nav button{font-size:9.5px!important}
+  .ph{grid-template-columns:58px minmax(0,1fr)!important}
+  .ph .av{width:58px!important;height:58px!important;min-width:58px!important}
+}
+
+@media(max-width:370px){
+  #nav button span{font-size:9px!important}
+  .head-actions{grid-template-columns:1fr!important}
+  #pf>.form-foot,#mf>.form-foot,.form-foot{grid-template-columns:1fr!important}
+  .ph{grid-template-columns:1fr!important}
+}
+
 </style>
 </head>
 <body>
@@ -975,6 +1159,7 @@ const NAV_ICONS={
   reglages:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>'
 };
 function renderNav(){
+  document.body.dataset.view=S.view;
   $('#nav').innerHTML='<p class="nav-label">Espace de travail</p>'+visibleViews().map(([k,l])=>`<button class="${S.view===k?'on':''}" onclick="go('${k}')"${S.view===k&&!S.pid?' aria-current="page"':''}>${NAV_ICONS[k]}<span>${l}</span></button>`).join('');
 }
 function quickSearch(v){
