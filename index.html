@@ -823,7 +823,7 @@ function render(){
   const views={accueil:viewAccueil,pipeline:viewPipeline,profils:viewProfils,calendrier:viewCal,reglages:viewReglages,admin:viewAdmin};
   $('#main').innerHTML=S.pid?viewFiche():views[S.view]();
   if(S.view==='pipeline'&&!S.pid) bindDnD();
-  if(S.view==='reglages'&&!S.pid) loadUsers();
+  if(S.view==='reglages'&&!S.pid&&S.me&&S.me.admin) loadUsers();
   if(S.view==='admin'&&!S.pid) loadAdmin();
 }
 
@@ -854,7 +854,7 @@ function viewAccueil(){
   const difHtml=dif.length?`<div class="rows">${dif.slice(0,6).map(x=>`<div class="row"><span class="row-d">${fds(x.d)}</span><button class="row-b" onclick="openP('${x.p.id}')"><strong>${esc(fullName(x.p))}</strong><span>${esc(x.p.titreEpisode||(x.p.numeroEpisode?'Épisode '+x.p.numeroEpisode:'Épisode sans titre'))}</span></button><span class="row-t">${x.l}</span></div>`).join('')}</div>`
     :`<p class="empty">Aucune diffusion programmée.</p>`;
 
-  return `<header class="page-h home-head"><div><p class="eyebrow">Vue d'ensemble</p><h1>${salut} Caroline</h1><p class="date">${fd(t,{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p></div><div class="head-actions"><button class="btn ghost" onclick="go('pipeline')">Voir le pipeline</button><button class="btn" onclick="openForm()">+ Nouveau profil</button></div></header>
+  return `<header class="page-h home-head"><div><p class="eyebrow">Vue d'ensemble</p><h1>${salut}${S.me&&S.me.name?' '+esc(S.me.name.trim().split(/\s+/)[0]):''}</h1><p class="date">${fd(t,{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p></div><div class="head-actions"><button class="btn ghost" onclick="go('pipeline')">Voir le pipeline</button><button class="btn" onclick="openForm()">+ Nouveau profil</button></div></header>
   <section class="strip" aria-label="Fiches par étape">${STAGES.map((s,i)=>`<button onclick="go('pipeline')"><span class="strip-n">${S.profils.filter(p=>(p.etape||'contact')===s.k).length}</span><span class="strip-l">${i+1}. ${s.l}</span></button>`).join('')}</section>
   <div class="dash">
     ${sans.length?`<section class="panel wide alert"><h2>Consentement à recueillir</h2><p>${sans.length>1?sans.length+' fiches actives n\'ont':'Une fiche active n\'a'} pas de consentement écrit : ${sans.map(p=>`<button class="link" onclick="openP('${p.id}')">${esc(fullName(p))}</button>`).join(', ')}. Les données de conversion restent bloquées tant qu'il manque.</p></section>`:''}
@@ -999,7 +999,7 @@ function viewReglages(){
   </div>
   <div class="set-foot"><button type="button" class="btn ghost" onclick="resyncAll()">Tout resynchroniser</button><button class="btn" type="submit">Enregistrer les réglages</button></div>
   </form>
-  <section class="panel" style="margin-top:22px"><h2>Utilisateurs</h2>
+  ${S.me&&S.me.admin?`  <section class="panel" style="margin-top:22px"><h2>Utilisateurs</h2>
     <p class="hint">Chaque personne a son identifiant et son mot de passe, avec accès complet au CRM. Tu crées l'accès avec un mot de passe provisoire, la personne choisit le sien à sa première connexion. Les échanges et les modifications de fiches indiquent qui les a faits.</p>
     <div id="ulist"><p class="muted">Chargement des comptes…</p></div>
     <form id="uf" onsubmit="addUser(event)" novalidate>
@@ -1013,6 +1013,7 @@ function viewReglages(){
       <div class="set-foot" style="margin-top:12px"><button class="btn" type="submit">Créer l'accès</button></div>
     </form>
   </section>
+`:''}
   <form id="pwf" class="panel" style="margin-top:22px" onsubmit="changePassword(event)" novalidate>
     <h2>Mon compte</h2>
     <div class="f" style="margin-bottom:6px"><label for="p_mail">Mon e-mail de récupération, pour « Mot de passe oublié »</label><div class="pw-row"><input id="p_mail" type="email" value="${esc((S.me&&S.me.email)||'')}" placeholder="prenom.nom@exemple.fr"><button type="button" class="btn ghost" onclick="saveMyEmail()">Enregistrer</button></div></div>
@@ -1263,8 +1264,8 @@ async function loadUsers(){
 function renderUsers(){
   const el=$('#ulist');if(!el)return;
   el.innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Identifiant</th><th class="hide-m">E-mail de récupération</th><th>Statut</th><th class="hide-m">Dernière connexion</th><th></th></tr></thead><tbody>
-  ${S.users.map(u=>`<tr style="cursor:default"><td><strong>${esc(u.name)}</strong>${u.isMe?' <span class="tag">toi</span>':''}</td><td>${esc(u.login)}</td><td class="hide-m">${u.email?esc(u.email):'<span class="muted">Aucun</span>'}</td><td><span class="tag ${u.active?'tag-ok':'tag-off'}">${u.active?'Actif':'Désactivé'}</span>${u.active&&u.mustChange?' <span class="tag tag-warn">Mot de passe provisoire</span>':''}</td><td class="hide-m">${u.lastLogin?fd(u.lastLogin.slice(0,10)):'Jamais'}</td>
-  <td><div class="u-act">${u.isMe?'':`<button class="link" onclick="resetUserPwd('${esc(u.login)}')">Nouveau mot de passe</button><button class="link" onclick="toggleUser('${esc(u.login)}',${!u.active})">${u.active?'Désactiver':'Réactiver'}</button><button class="link" onclick="deleteUser('${esc(u.login)}')">Supprimer</button>`}</div></td></tr>`).join('')}
+  ${S.users.map(u=>`<tr style="cursor:default"><td><strong>${esc(u.name)}</strong>${u.admin?' <span class="tag">Admin</span>':''}${u.isMe?' <span class="tag">toi</span>':''}</td><td>${esc(u.login)}</td><td class="hide-m">${u.email?esc(u.email):'<span class="muted">Aucun</span>'}</td><td><span class="tag ${u.active?'tag-ok':'tag-off'}">${u.active?'Actif':'Désactivé'}</span>${u.active&&u.mustChange?' <span class="tag tag-warn">Mot de passe provisoire</span>':''}</td><td class="hide-m">${u.lastLogin?fd(u.lastLogin.slice(0,10)):'Jamais'}</td>
+  <td><div class="u-act">${u.isMe||u.admin?'':`<button class="link" onclick="resetUserPwd('${esc(u.login)}')">Nouveau mot de passe</button><button class="link" onclick="toggleUser('${esc(u.login)}',${!u.active})">${u.active?'Désactiver':'Réactiver'}</button><button class="link" onclick="deleteUser('${esc(u.login)}')">Supprimer</button>`}</div></td></tr>`).join('')}
   </tbody></table></div>`;
 }
 async function saveMyEmail(){
@@ -1655,17 +1656,17 @@ const Mock=(()=>{
   const up=(list,o)=>{const i=list.findIndex(x=>x.id===o.id);if(i<0)list.push(o);else list[i]=o;};
   const api={
     api_status:()=>ok({needsSetup:false,version:'démo'}),
-    api_login:(login,pwd)=>{const u=users[login];if(!u||!u.active||(pwd!=='demo'&&pwd!==u.pwd))return Promise.reject(new Error('Identifiant ou mot de passe incorrect.'));u.lastLogin=new Date().toISOString();session=uid();me={login,name:u.name,admin:login==='caroline'};return ok({token:session,mustChange:!!u.mustChange});},
+    api_login:(login,pwd)=>{const u=users[login];if(!u||!u.active||(pwd!=='demo'&&pwd!==u.pwd))return Promise.reject(new Error('Identifiant ou mot de passe incorrect.'));u.lastLogin=new Date().toISOString();session=uid();me={login,name:u.name,admin:['caroline','demphis'].includes(login)};return ok({token:session,mustChange:!!u.mustChange});},
     api_getPhotos:()=>ok({}),
     api_forgot:()=>ok({ok:true}),
-    api_resetWithCode:(login,code)=>{const u=users[login];if(!u||code!=='123456')return Promise.reject(new Error('Code incorrect ou expiré.'));delete u.mustChange;session=uid();me={login,name:u.name,email:u.email||'',admin:login==='caroline'};return ok({token:session});},
+    api_resetWithCode:(login,code)=>{const u=users[login];if(!u||code!=='123456')return Promise.reject(new Error('Code incorrect ou expiré.'));delete u.mustChange;session=uid();me={login,name:u.name,email:u.email||'',admin:['caroline','demphis'].includes(login)};return ok({token:session});},
     api_setMyEmail:v=>{if(users[me.login])users[me.login].email=v;return ok(true);},
     api_adminStatus:()=>ok({version:'démo',compte:'podcast.guerim@gmail.com',classeurUrl:'https://docs.google.com/',fuseau:'Europe/Paris',profils:db.profils.length,echanges:db.echanges.length,utilisateurs:Object.keys(users).length,quotaMail:97,gmailAdvanced:true,agenda:'Guérim',agendaInterne:true,invitations:[settings.outlookEmail,settings.gmailEmail],erreurs24h:1,refus24h:2,connexions24h:4,ms:640,
       journal:[{date:new Date().toISOString(),niveau:'info',utilisateur:me.name,action:'Connexion',detail:me.login},{date:new Date(Date.now()-3.6e6).toISOString(),niveau:'erreur',utilisateur:'Caroline Amouyal',action:'Synchronisation agenda',detail:'Sophie M. / Invitation agenda : Service invoked too many times for one day: email.'},{date:new Date(Date.now()-7.2e6).toISOString(),niveau:'alerte',utilisateur:'',action:'Connexion refusée',detail:'identifiant saisi : carolin'},{date:new Date(Date.now()-9e6).toISOString(),niveau:'info',utilisateur:'Léa Cohen',action:'Fiche créée',detail:'Inès F.'}]}),
     api_adminTest:(what)=>ok({ok:true,ms:420,detail:'Test '+what+' simulé'}),
     api_syncProfil:id=>{const p=db.profils.find(x=>x.id===id);return ok({syncIds:p?p.syncIds:'',_warn:''});},
     api_syncEchange:()=>ok({syncIds:'',_warn:''}),
-    api_listUsers:()=>ok(Object.entries(users).map(([login,u])=>({login,name:u.name,email:u.email||'',active:u.active,lastLogin:u.lastLogin||'',mustChange:!!u.mustChange,isMe:login===me.login})).sort((a,b)=>a.name.localeCompare(b.name,'fr'))),
+    api_listUsers:()=>ok(Object.entries(users).map(([login,u])=>({login,name:u.name,email:u.email||'',admin:['caroline','demphis'].includes(login),active:u.active,lastLogin:u.lastLogin||'',mustChange:!!u.mustChange,isMe:login===me.login})).sort((a,b)=>a.name.localeCompare(b.name,'fr'))),
     api_addUser:(login,name,pwd,mail)=>{if(users[login])return Promise.reject(new Error('Cet identifiant est déjà pris.'));users[login]={name,active:true,lastLogin:'',mustChange:true,pwd,email:mail||''};return ok(true);},
     api_setUserActive:(login,active)=>{users[login].active=active;return ok(true);},
     api_resetUserPassword:login=>{if(users[login])users[login].mustChange=true;return ok(true);},
