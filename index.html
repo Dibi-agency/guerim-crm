@@ -636,6 +636,28 @@ input[type=date],input[type=time]{display:block;min-width:0;max-width:100%;width
   .top-logo{display:block;flex:none;width:44px;height:44px;border-radius:12px;object-fit:contain;background:#FBF8F3;border:1px solid var(--g-line);padding:2px;cursor:pointer}
   .topbar-search{flex:1;min-width:0}
 }
+/* v3.12 : posts réseaux */
+.ev-post{background:#EEE8F5;color:#5B437A}
+.ev-post.done{background:#F1EEEB;color:#8A7C75;text-decoration:line-through}
+#tf{padding:2px 24px 24px}
+#tf input,#tf select,#tf textarea{border:1px solid #E5DED8;background:#fff;border-radius:9px;padding:9px 10px;min-height:38px;outline:none;width:100%;min-width:0}
+#tf input:focus,#tf select:focus,#tf textarea:focus{border-color:#C8AB8D;box-shadow:0 0 0 3px rgba(200,171,141,.16)}
+#tf .check input,#tf .net input{width:18px;height:18px;min-height:0;padding:0}
+#tf textarea{resize:vertical;font-family:var(--sans);line-height:1.5}
+.f-lab{font-size:11.5px;font-weight:600;color:#776A64}
+.nets{display:flex;flex-wrap:wrap;gap:8px}
+.net{display:inline-flex;align-items:center;gap:7px;padding:8px 12px;border:1px solid #E5DED8;border-radius:999px;background:#fff;cursor:pointer;font-size:13px}
+.net:has(input:checked){border-color:#C8AB8D;background:#F4EBE1}
+.net input{accent-color:#381A10}
+.cal-nav .btn{padding:0 14px;height:36px}
+@media(max-width:820px){
+  #tf{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:12px 16px 0;display:flex;flex-direction:column}
+  #tf>.form-foot{order:99;position:sticky;bottom:0;margin:20px -16px 0;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:#FBFAF8;border-top:1px solid var(--g-line);display:grid;grid-template-columns:1fr 1.4fr;gap:10px}
+  #tf input,#tf select,#tf textarea{min-height:46px;font-size:16px}
+  #tf .check input,#tf .net input{min-height:0}
+  .net{min-height:44px;font-size:14px}
+  .cal-nav{grid-template-columns:auto 44px 1fr 44px;gap:8px}
+}
 *:focus-visible{outline:2px solid #A77E62;outline-offset:2px}
 
 @media(min-width:821px){.demo{top:auto;bottom:16px;right:16px}}
@@ -704,12 +726,13 @@ const SOURCES={spontanee:'Candidature spontanée',recommandation:'Recommandation
 const MAIL_TPL={consentement:'Demande de consentement',convocation:"Convocation à l'enregistrement",relance:'Relance',diffusion:'Annonce de diffusion',libre:'Message libre'};
 const PROFIL_FIELDS=['id','createdAt','updatedAt','prenom','nom','sexe','dateNaissance','nationalite','ville','telephone','email','consentement','dateConsentement','courant','courantAutre','statutConversion','dateConversion','beitDin','source','tags','notes','etape','motifNonRetenu','datePreEntretien','heurePreEntretien','dateEnregistrement','heureEnregistrement','lieuEnregistrement','numeroEpisode','titreEpisode','dateDiffusionRadio','dateMiseEnLigne','lienEpisode','photo','syncIds'];
 const SENSITIVE=['courant','courantAutre','statutConversion','dateConversion','beitDin'];
+const RESEAUX={instagram:'Instagram',facebook:'Facebook',linkedin:'LinkedIn',tiktok:'TikTok',youtube:'YouTube',x:'X'};
 const LOGIN_RE=/^[a-z0-9._-]{3,30}$/;
 const KEEP_ON_WITHDRAW=['id','createdAt','etape','datePreEntretien','dateEnregistrement','lieuEnregistrement','numeroEpisode','titreEpisode','dateDiffusionRadio','dateMiseEnLigne','lienEpisode'];
 const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /* ---------- État ---------- */
-const S={token:'',me:null,users:[],profils:[],echanges:[],settings:{},gmailAdvanced:true,view:'accueil',pid:null,f:{q:'',courant:'',etape:'',sexe:''},cal:null,editing:null,formPhoto:'',mailPid:null};
+const S={posts:[],token:'',me:null,users:[],profils:[],echanges:[],settings:{},gmailAdvanced:true,view:'accueil',pid:null,f:{q:'',courant:'',etape:'',sexe:''},cal:null,editing:null,formPhoto:'',mailPid:null};
 
 /* ---------- Pont serveur (Apps Script ou démo) ---------- */
 const isGAS=typeof google!=='undefined'&&google.script&&google.script.run;
@@ -815,6 +838,8 @@ function viewAccueil(){
     if(p.dateMiseEnLigne>=t) dif.push({d:p.dateMiseEnLigne,l:'En ligne',p});
   });
   dif.sort((a,b)=>a.d.localeCompare(b.d));
+  const posts=S.posts.filter(x=>x.statut!=='publie'&&x.date&&x.date<=w).sort((a,b)=>(a.date+(a.heure||'99')).localeCompare(b.date+(b.heure||'99')));
+  const postHtml=posts.length?`<div class="rows">${posts.map(x=>{const late=x.date<t;return `<div class="row${late?' late':''}"><button class="chk" title="Marquer comme publié" aria-label="Marquer comme publié" onclick="markPost('${x.id}',true)"></button><button class="row-b" onclick="openPost('${x.id}')"><strong>${esc(postLabel(x))}</strong><span>${esc(netsTxt(x)||'Réseaux')}, ${late?'en retard depuis le '+fds(x.date):x.date===t?"aujourd'hui"+at(x.heure):fd(x.date,{weekday:'long',day:'numeric',month:'short'})+at(x.heure)}</span></button></div>`;}).join('')}</div>`:`<p class="empty">Aucun post prévu d'ici sept jours.</p>`;
   const sans=S.profils.filter(needsConsent);
   const salut=new Date().getHours()<18?'Bonjour':'Bonsoir';
 
@@ -833,7 +858,7 @@ function viewAccueil(){
   <section class="strip" aria-label="Fiches par étape">${STAGES.map((s,i)=>`<button onclick="go('pipeline')"><span class="strip-n">${S.profils.filter(p=>(p.etape||'contact')===s.k).length}</span><span class="strip-l">${i+1}. ${s.l}</span></button>`).join('')}</section>
   <div class="dash">
     ${sans.length?`<section class="panel wide alert"><h2>Consentement à recueillir</h2><p>${sans.length>1?sans.length+' fiches actives n\'ont':'Une fiche active n\'a'} pas de consentement écrit : ${sans.map(p=>`<button class="link" onclick="openP('${p.id}')">${esc(fullName(p))}</button>`).join(', ')}. Les données de conversion restent bloquées tant qu'il manque.</p></section>`:''}
-    <section class="panel"><h2>Relances</h2>${relHtml}</section>
+    <section class="panel"><h2>Relances</h2>${relHtml}<h2 style="margin-top:28px;display:flex;justify-content:space-between;align-items:center">Posts réseaux <button class="link" onclick="openPost()">+ Prévoir un post</button></h2>${postHtml}</section>
     <section class="panel"><h2>Prochains enregistrements</h2>${enrHtml}<h2 style="margin-top:28px">Diffusions à venir</h2>${difHtml}</section>
   </div>`;
 }
@@ -910,6 +935,7 @@ function events(){
   const out=[];
   S.profils.forEach(p=>{[['datePreEntretien','heurePreEntretien','pre','Pré-entretien'],['dateEnregistrement','heureEnregistrement','enr','Enregistrement'],['dateDiffusionRadio','','radio','Radio'],['dateMiseEnLigne','','web','En ligne']].forEach(([f,h,c,l])=>{if(p[f])out.push({d:p[f],h:h?p[h]:'',c,l,p});});});
   S.echanges.forEach(e=>{if(e.dateRelance&&e.faite!=='oui'){const p=byId(e.profilId);if(p)out.push({d:e.dateRelance,h:'',c:'rel',l:'Relance',p});}});
+  S.posts.forEach(t=>{if(t.date)out.push({d:t.date,h:t.heure||'',c:t.statut==='publie'?'post done':'post',l:'Post',t});});
   return out;
 }
 function calMove(n){if(n===0){const d=new Date();S.cal={y:d.getFullYear(),m:d.getMonth()};}else{const d=new Date(S.cal.y,S.cal.m+n,1);S.cal={y:d.getFullYear(),m:d.getMonth()};}render();}
@@ -921,7 +947,9 @@ function viewCal(){
   const total=Math.ceil((start+days)/7)*7;
   const prefix=`${y}-${String(m+1).padStart(2,'0')}`;
   const ev=events().filter(e=>e.d.startsWith(prefix)).sort((a,b)=>(a.d+(a.h||'99')).localeCompare(b.d+(b.h||'99')));
-  const chip=e=>`<button class="ev ev-${e.c}" onclick="openP('${e.p.id}')" title="${esc(e.l+at(e.h)+' : '+fullName(e.p))}">${e.h?esc(hfmt(e.h))+' ':''}${esc(e.l)} : ${esc(e.p.prenom||fullName(e.p))}</button>`;
+  const chip=e=>e.t
+    ?`<button class="ev ev-${e.c}" onclick="openPost('${e.t.id}')" title="${esc('Post'+at(e.h)+' : '+postLabel(e.t))}">${e.h?esc(hfmt(e.h))+' ':''}${e.c.includes('done')?'✓ ':''}${esc(postLabel(e.t))}</button>`
+    :`<button class="ev ev-${e.c}" onclick="openP('${e.p.id}')" title="${esc(e.l+at(e.h)+' : '+fullName(e.p))}">${e.h?esc(hfmt(e.h))+' ':''}${esc(e.l)} : ${esc(e.p.prenom||fullName(e.p))}</button>`;
   let cells='';
   for(let i=0;i<total;i++){
     const day=i-start+1;
@@ -932,10 +960,10 @@ function viewCal(){
   const groups={};ev.forEach(e=>(groups[e.d]=groups[e.d]||[]).push(e));
   const agenda=Object.keys(groups).length?Object.entries(groups).map(([d,list])=>`<p class="ag-d">${fd(d,{weekday:'long',day:'numeric',month:'long'})}</p>${list.map(chip).join('')}`).join(''):'<p class="empty">Rien de prévu ce mois-ci.</p>';
   const sync=activeTargets();
-  return `<header class="page-h"><div><p class="eyebrow">Planning éditorial</p><h1 style="text-transform:capitalize">${title}</h1><p class="sub">${sync.length?'Envoyé vers ton agenda '+sync.join(' et ')+'.':"Aucun agenda personnel relié."} <button class="link" onclick="go('reglages')">Réglages</button></p></div><div class="cal-nav"><button class="ib" onclick="calMove(-1)" aria-label="Mois précédent">‹</button><button class="ib" onclick="calMove(0)">Aujourd'hui</button><button class="ib" onclick="calMove(1)" aria-label="Mois suivant">›</button></div></header>
+  return `<header class="page-h"><div><p class="eyebrow">Planning éditorial</p><h1 style="text-transform:capitalize">${title}</h1><p class="sub">${sync.length?'Envoyé vers ton agenda '+sync.join(' et ')+'.':"Aucun agenda personnel relié."} <button class="link" onclick="go('reglages')">Réglages</button></p></div><div class="cal-nav"><button class="btn" onclick="openPost()">+ Post</button><button class="ib" onclick="calMove(-1)" aria-label="Mois précédent">‹</button><button class="ib" onclick="calMove(0)">Aujourd'hui</button><button class="ib" onclick="calMove(1)" aria-label="Mois suivant">›</button></div></header>
   <div class="cal">${['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map(d=>`<div class="cal-wd">${d}</div>`).join('')}${cells}</div>
   <div class="agenda">${agenda}</div>
-  <div class="legend"><span class="ev ev-pre">Pré-entretien</span><span class="ev ev-enr">Enregistrement</span><span class="ev ev-radio">Radio</span><span class="ev ev-web">En ligne</span><span class="ev ev-rel">Relance</span></div>`;
+  <div class="legend"><span class="ev ev-pre">Pré-entretien</span><span class="ev ev-enr">Enregistrement</span><span class="ev ev-radio">Radio</span><span class="ev ev-web">En ligne</span><span class="ev ev-rel">Relance</span><span class="ev ev-post">Post réseaux</span></div>`;
 }
 
 /* ---------- Réglages ---------- */
@@ -959,6 +987,7 @@ function viewReglages(){
     <section class="panel"><h2>Contenu envoyé</h2>
       <p class="hint">Pré-entretiens, enregistrements, diffusions radio et mises en ligne sont toujours inclus. Les titres portent le prénom et l'initiale du nom. Aucune donnée de conversion ne quitte le CRM.</p>
       <label class="check"><input type="checkbox" name="relances"${s.relances==='oui'?' checked':''}><span>Inclure les relances, avec le texte de la prochaine action</span></label>
+      <label class="check"><input type="checkbox" name="posts"${s.posts!=='non'?' checked':''}><span>Inclure les posts réseaux à publier, avec leur texte</span></label>
       <label class="check"><input type="checkbox" name="google"${s.google==='oui'?' checked':''}><span>Tenir aussi l'agenda interne « ${esc(s.calName||'Guérim')} » du compte qui héberge le CRM</span></label>
       <input type="hidden" name="calName" value="${esc(s.calName)}">
     </section>
@@ -997,8 +1026,8 @@ function viewReglages(){
 function busyTyping(){const a=document.activeElement;return !$('#modal').hidden||(a&&['INPUT','TEXTAREA','SELECT'].includes(a.tagName));}
 // Agenda : la fiche est enregistrée tout de suite, la synchronisation suit sans bloquer l'écran.
 function bgSync(kind,id){
-  call(kind==='profil'?'api_syncProfil':'api_syncEchange',id).then(r=>{
-    const o=(kind==='profil'?S.profils:S.echanges).find(x=>x.id===id);
+  call(kind==='profil'?'api_syncProfil':kind==='post'?'api_syncPost':'api_syncEchange',id).then(r=>{
+    const o=(kind==='profil'?S.profils:kind==='post'?S.posts:S.echanges).find(x=>x.id===id);
     if(o)o.syncIds=r.syncIds||'';
     if(r._warn)toast(r._warn,true);
     else if(kind==='profil'&&S.pid===id&&!busyTyping())render();
@@ -1011,11 +1040,11 @@ function loadPhotos(){
   }).catch(()=>{});
 }
 function renderMe(){const c=$('.user-chip');if(!c||!S.me)return;const ini=S.me.name.split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();c.innerHTML=`<span>${esc(ini)}</span><div><strong>${esc(S.me.name)}</strong><small>${esc(S.me.login)}</small></div>`;}
-async function reload(){const d=await call('api_getAll');S.me=d.me||null;renderMe();S.profils=d.profils||[];S.echanges=d.echanges||[];S.settings=d.settings||{};S.gmailAdvanced=d.gmailAdvanced!==false;$('#ver').textContent='Version '+d.version;}
+async function reload(){const d=await call('api_getAll');S.me=d.me||null;renderMe();S.profils=d.profils||[];S.echanges=d.echanges||[];S.posts=d.posts||[];S.settings=d.settings||{};S.gmailAdvanced=d.gmailAdvanced!==false;$('#ver').textContent='Version '+d.version;}
 async function saveSettings(ev){
   ev.preventDefault();
   const el=ev.target.elements,btn=ev.target.querySelector('button[type=submit]');
-  const s={google:el.google.checked?'oui':'non',calName:el.calName.value.trim(),inviteOutlook:el.inviteOutlook.checked?'oui':'non',outlookEmail:el.outlookEmail.value.trim(),inviteGmail:el.inviteGmail.checked?'oui':'non',gmailEmail:el.gmailEmail.value.trim(),relances:el.relances.checked?'oui':'non',expediteur:el.expediteur.value.trim(),replyTo:el.replyTo.value.trim(),signature:el.signature.value.trim()};
+  const s={google:el.google.checked?'oui':'non',calName:el.calName.value.trim(),inviteOutlook:el.inviteOutlook.checked?'oui':'non',outlookEmail:el.outlookEmail.value.trim(),inviteGmail:el.inviteGmail.checked?'oui':'non',gmailEmail:el.gmailEmail.value.trim(),relances:el.relances.checked?'oui':'non',posts:el.posts.checked?'oui':'non',expediteur:el.expediteur.value.trim(),replyTo:el.replyTo.value.trim(),signature:el.signature.value.trim()};
   if(s.inviteOutlook==='oui'&&!EMAIL_RE.test(s.outlookEmail)){toast('Indique une adresse Outlook valide.',true);el.outlookEmail.focus();return;}
   if(s.inviteGmail==='oui'&&!EMAIL_RE.test(s.gmailEmail)){toast('Indique une adresse Gmail valide.',true);el.gmailEmail.focus();return;}
   if(s.replyTo&&!EMAIL_RE.test(s.replyTo)){toast("L'adresse de réponse n'est pas valide.",true);el.replyTo.focus();return;}
@@ -1323,7 +1352,8 @@ function viewFiche(){
       <section class="group"><h2>Suivi</h2>${dl([['Consentement',consentTxt],['Source',esc(SOURCES[p.source]||'')],['Tags',tags],['Motif',p.etape==='nonretenu'?esc(p.motifNonRetenu):''],['Notes',esc(p.notes)],['Modifiée',p.modifiePar?esc(p.modifiePar)+(p.updatedAt?', le '+fd(p.updatedAt.slice(0,10)):''):'']])}</section>
       <section class="group"><h2>Production</h2>${dl([['Pré-entretien',p.datePreEntretien?fd(p.datePreEntretien)+at(p.heurePreEntretien):''],['Enregistrement',p.dateEnregistrement?fd(p.dateEnregistrement)+at(p.heureEnregistrement):''],['Lieu',esc(p.lieuEnregistrement)],['Épisode',esc([p.numeroEpisode?'n° '+p.numeroEpisode:'',p.titreEpisode].filter(Boolean).join(', '))],['Diffusion radio',fd(p.dateDiffusionRadio)],['Mise en ligne',fd(p.dateMiseEnLigne)],['Lien',p.lienEpisode?`<a href="${esc(p.lienEpisode)}" target="_blank" rel="noopener">Écouter l'épisode</a>`:''],['Agendas',agendaTxt(p)]])}</section>
     </div>
-    <section><h2>Échanges</h2>
+    <section><div class="group" style="margin-bottom:16px"><h2 style="display:flex;justify-content:space-between;align-items:center">Posts réseaux ${retired?'':`<button class="link" onclick="openPost('','${p.id}')">+ Prévoir un post</button>`}</h2>${(()=>{const l=S.posts.filter(x=>x.profilId===p.id).sort((a,b)=>b.date.localeCompare(a.date));return l.length?`<div class="rows">${l.map(x=>`<div class="row"><span class="row-d">${fds(x.date)}</span><button class="row-b" onclick="openPost('${x.id}')"><strong>${esc(postLabel(x))}</strong><span>${esc(netsTxt(x)||'Réseaux')}</span></button><span class="tag ${x.statut==='publie'?'tag-ok':''}">${x.statut==='publie'?'Publié':'À publier'}</span></div>`).join('')}</div>`:'<p class="muted">Aucun post lié à cette fiche.</p>';})()}</div>
+    <h2>Échanges</h2>
       ${retired?'':`<form class="ex-form" onsubmit="addEchange(event,'${p.id}')">
         <div class="ex-row"><select name="canal" aria-label="Canal">${Object.entries(CANAUX).map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select><input type="date" name="date" value="${t}" aria-label="Date de l'échange" required></div>
         <textarea name="resume" rows="3" placeholder="Ce qui s'est dit" aria-label="Résumé de l'échange" required></textarea>
@@ -1425,6 +1455,53 @@ async function sendMail(ev){
   btn.disabled=true;
   try{const e=await call('api_sendMail',S.mailPid,subject,body,!!(el.invite&&el.invite.checked));S.echanges.push(e);closeForm();render();toast('Mail envoyé et ajouté au journal');}
   catch(err){btn.disabled=false;toast("Mail non envoyé. "+msg(err),true);}
+}
+
+/* ---------- Posts réseaux ---------- */
+const netsTxt=x=>String(x.reseaux||'').split(',').map(k=>RESEAUX[k]).filter(Boolean).join(', ');
+function postLabel(x){const p=x.profilId?byId(x.profilId):null;return (x.sujet||'Post')+(p&&p.consentement!=='retire'?' ('+(p.prenom||fullName(p))+')':'');}
+function openPost(id,profilId){
+  const x=id?{...S.posts.find(t=>t.id===id)}:{date:today(),heure:'',reseaux:'instagram',statut:'a_faire',profilId:profilId||''};
+  S.editPost=id||null;
+  const nets=String(x.reseaux||'').split(',');
+  const people=S.profils.filter(p=>p.consentement!=='retire').sort((a,b)=>fullName(a).localeCompare(fullName(b),'fr'));
+  const m=$('#modal');
+  m.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="tt">
+  <header><h2 id="tt">${id?'Modifier le post':'Prévoir un post'}</h2><button class="x" onclick="closeForm()" aria-label="Fermer">×</button></header>
+  <form id="tf" onsubmit="savePost(event)" novalidate>
+    <fieldset><legend>Publication</legend><div class="grid">
+      ${F('date','Date',x.date,'date')}${F('heure','Heure, facultative',x.heure,'time')}
+      <div class="f full"><span class="f-lab">Réseaux</span><div class="nets">${Object.entries(RESEAUX).map(([k,l])=>`<label class="net"><input type="checkbox" name="net" value="${k}"${nets.includes(k)?' checked':''}><span>${l}</span></label>`).join('')}</div></div>
+      ${F('sujet','Sujet',x.sujet,'text',{full:true,attrs:'placeholder="Annonce épisode 15, extrait, coulisses…"'})}
+      <div class="f full"><label for="f_texte">Texte du post, facultatif</label><textarea id="f_texte" name="texte" rows="6" oninput="$('#tcount').textContent=this.value.length+' caractères'">${esc(x.texte)}</textarea><small id="tcount" class="hint">${(x.texte||'').length} caractères</small></div>
+      <div class="f full"><label for="f_prof">Invité concerné, facultatif</label><select id="f_prof" name="profilId"><option value="">Aucun</option>${people.map(p=>`<option value="${p.id}"${p.id===x.profilId?' selected':''}>${esc(fullName(p))}</option>`).join('')}</select></div>
+      <label class="check full"><input type="checkbox" name="publie"${x.statut==='publie'?' checked':''}><span>Publié</span></label>
+    </div></fieldset>
+    <div class="form-foot">${id?`<button type="button" class="btn danger" onclick="delPost('${id}')">Supprimer</button>`:'<button type="button" class="btn ghost" onclick="closeForm()">Annuler</button>'}<button class="btn" type="submit">${id?'Enregistrer':'Ajouter au planning'}</button></div>
+  </form></div>`;
+  m.hidden=false;document.body.style.overflow='hidden';document.body.classList.add('modal-open');
+}
+async function savePost(ev){
+  ev.preventDefault();
+  const fm=ev.target,el=fm.elements,btn=fm.querySelector('button[type=submit]');
+  const nets=[...fm.querySelectorAll('input[name=net]:checked')].map(i=>i.value);
+  const d={id:S.editPost||'',date:el.date.value,heure:el.heure.value,reseaux:nets.join(','),sujet:el.sujet.value.trim(),texte:el.texte.value.trim(),profilId:el.profilId.value,statut:el.publie.checked?'publie':'a_faire'};
+  if(!d.date){toast('Indique la date de publication.',true);el.date.focus();return;}
+  if(!d.sujet&&!d.texte){toast('Indique au moins un sujet ou un texte.',true);el.sujet.focus();return;}
+  busy(btn,true,'Enregistrement…');
+  try{const saved=await call('api_savePost',d);upsertLocal(S.posts,saved);closeForm();render();toast(S.editPost?'Post enregistré':'Post ajouté au planning');bgSync('post',saved.id);}
+  catch(e){busy(btn,false);toast(msg(e),true);}
+}
+async function markPost(id,done){
+  const x=S.posts.find(t=>t.id===id);if(!x)return;
+  const old=x.statut;x.statut=done?'publie':'a_faire';render();
+  try{const saved=await call('api_savePost',{...x});upsertLocal(S.posts,saved);toast(done?'Post marqué comme publié':'Post remis à publier');bgSync('post',id);}
+  catch(e){x.statut=old;render();toast(msg(e),true);}
+}
+async function delPost(id){
+  if(!confirm('Supprimer ce post du planning ?'))return;
+  try{const r=await call('api_deletePost',id);const w=takeWarn(r);S.posts=S.posts.filter(t=>t.id!==id);closeForm();render();toast(w||'Post supprimé',!!w);}
+  catch(e){toast(msg(e),true);}
 }
 
 /* ---------- Formulaire profil ---------- */
@@ -1553,6 +1630,11 @@ const Mock=(()=>{
       P({id:'p6',prenom:'Marc',nom:'Dubois',sexe:'M',dateNaissance:'1970-05-05',nationalite:'Française',ville:'Nantes',telephone:'06 11 22 33 44',consentement:'oui',dateConsentement:D(-45),courant:'orthodoxe',statutConversion:'achevee',dateConversion:'2015-12-01',source:'recommandation',etape:'nonretenu',motifNonRetenu:"Ne souhaite pas parler de sa famille à l'antenne."}),
       P({id:'p7',prenom:'Nathalie',nom:'Girard',sexe:'F',dateNaissance:'1982-02-11',nationalite:'Suisse',ville:'Genève',telephone:'+41 79 123 45 67',email:'n.girard@exemple.ch',consentement:'oui',dateConsentement:D(-9),courant:'massorti',statutConversion:'encours',source:'facebook',tags:'conversion avec enfants',etape:'retenu',datePreEntretien:D(-4)})
     ],
+    posts:[
+      {id:'t1',date:D(1),heure:'12:00',reseaux:'instagram,facebook',sujet:'Annonce épisode 14',texte:"Jeudi, Sophie nous raconte quatre ans de chemin vers le judaïsme. Nouvel épisode de Guérim.",profilId:'p1',statut:'a_faire',syncIds:''},
+      {id:'t2',date:D(-1),heure:'',reseaux:'linkedin',sujet:'Coulisses du studio',texte:'',profilId:'',statut:'a_faire',syncIds:''},
+      {id:'t3',date:D(-28),heure:'18:00',reseaux:'instagram',sujet:'Épisode 9 en ligne',texte:'',profilId:'p3',statut:'publie',syncIds:''}
+    ],
     echanges:[
       {id:'e1',profilId:'p1',createdAt:'1',date:D(-20),canal:'mail',resume:"Premier message après l'écoute de l'épisode 6. Raconte sa conversion sur quatre ans avec son mari.",prochaineAction:'',dateRelance:'',faite:'non',syncIds:''},
       {id:'e2',profilId:'p1',createdAt:'2',date:D(-12),canal:'appel',resume:"Pré-entretien de 40 minutes. Angle retenu : le regard de la belle-famille.\nDisponible les matinées.",prochaineAction:'Envoyer la convocation studio',dateRelance:D(0),faite:'non',syncIds:''},
@@ -1590,7 +1672,10 @@ const Mock=(()=>{
     api_deleteUser:login=>{delete users[login];return ok(true);},
     api_logout:()=>{session='';return ok(true);},
     api_changePassword:(cur)=>{const u0=users[me.login];if(cur!=='demo'&&!(u0&&cur===u0.pwd))return Promise.reject(new Error('Le mot de passe actuel est incorrect.'));if(users[me.login])delete users[me.login].mustChange;return ok(true);},
-    api_getAll:()=>ok({version:'démo',me,settings,gmailAdvanced:true,profils:db.profils,echanges:db.echanges}),
+    api_getAll:()=>ok({version:'démo',me,settings,gmailAdvanced:true,profils:db.profils,echanges:db.echanges,posts:db.posts}),
+    api_savePost:t=>{t={...t};if(!t.id){t.id=uid();t.createdAt=new Date().toISOString();t.auteur=me.name;}up(db.posts,t);return ok(t);},
+    api_syncPost:()=>ok({syncIds:'',_warn:''}),
+    api_deletePost:id=>{db.posts=db.posts.filter(t=>t.id!==id);return ok({ok:true});},
     api_saveProfil:p=>{p={...p};const now=new Date().toISOString();p.modifiePar=me.name;if(!p.id){p.id=uid();p.createdAt=now;}p.updatedAt=now;if(!p.etape)p.etape='contact';if(p.consentement!=='oui')SENSITIVE.forEach(k=>p[k]='');p.syncIds=fakeSync(p);up(db.profils,p);return ok(p);},
     api_deleteProfil:id=>{db.profils=db.profils.filter(p=>p.id!==id);db.echanges=db.echanges.filter(e=>e.profilId!==id);return ok({ok:true});},
     api_retirerConsentement:id=>{const c=db.profils.find(p=>p.id===id);const k={};PROFIL_FIELDS.forEach(f=>k[f]=KEEP_ON_WITHDRAW.includes(f)?c[f]:'');Object.assign(k,{prenom:'Profil',nom:'retiré',consentement:'retire',dateConsentement:today()});up(db.profils,k);db.echanges=db.echanges.filter(e=>e.profilId!==id);return ok(k);},
