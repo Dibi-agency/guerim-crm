@@ -8,11 +8,13 @@
  * v3.5 : chaque utilisateur choisit son mot de passe à la première connexion.
  * v3.6 : mot de passe oublié (code par e-mail), e-mail de récupération par compte.
  * v3.7 : point d'accès doPost pour l'application installable (PWA hébergée sur GitHub Pages).
+ * v3.8 : option « Rester connecté 30 jours » sur l'appareil.
+ * v3.9 : posts réseaux sociaux planifiés dans l'agenda.
  * Données stockées dans un Google Sheets privé, créé automatiquement
  * dans le Drive du compte qui déploie l'application.
  */
 
-const APP_VERSION = '3.7.0 (2026-10-07)';
+const APP_VERSION = '3.9.0 (2026-10-08)';
 
 const SHEET_PROFILS = 'Profils';
 const SHEET_ECHANGES = 'Echanges';
@@ -40,6 +42,12 @@ const ECHANGE_FIELDS = [
   'prochaineAction', 'dateRelance', 'faite', 'syncIds', 'auteur'
 ];
 
+const SHEET_POSTS = 'Posts';
+const POST_FIELDS = [
+  'id', 'createdAt', 'updatedAt', 'date', 'heure', 'reseaux', 'sujet', 'texte',
+  'profilId', 'statut', 'auteur', 'syncIds'
+];
+
 // Données révélant une conviction religieuse (RGPD, art. 9) : jamais stockées sans consentement,
 // jamais envoyées vers un agenda.
 const SENSITIVE_FIELDS = ['courant', 'courantAutre', 'statutConversion', 'dateConversion', 'beitDin'];
@@ -60,6 +68,7 @@ const DEFAULT_SETTINGS = {
   inviteGmail: 'non',       // invitations vers l'agenda Google de Caroline
   gmailEmail: '',
   relances: 'oui',
+  posts: 'oui',             // posts réseaux envoyés vers les agendas
   expediteur: 'Podcast Guérim',
   replyTo: '',              // les réponses des invités arrivent dans sa vraie boîte
   signature: 'Caroline Amouyal\nPodcast Guérim'
@@ -69,6 +78,7 @@ const SESSION_SECONDS = 21600;  // 6 h, prolongées à chaque action
 const MAX_FAILS = 5;            // tentatives avant blocage
 const LOCK_SECONDS = 900;       // blocage de 15 min
 const MIN_PASSWORD = 10;
+const LONG_SESSION_DAYS = 30; // option « Rester connecté »
 
 /* ---------- Web app ---------- */
 
@@ -105,6 +115,7 @@ function remoteApi_() {
     api_getAll: api_getAll, api_getPhotos: api_getPhotos, api_saveProfil: api_saveProfil, api_syncProfil: api_syncProfil,
     api_deleteProfil: api_deleteProfil, api_retirerConsentement: api_retirerConsentement,
     api_saveEchange: api_saveEchange, api_syncEchange: api_syncEchange, api_deleteEchange: api_deleteEchange,
+    api_savePost: api_savePost, api_syncPost: api_syncPost, api_deletePost: api_deletePost,
     api_sendMail: api_sendMail, api_saveSettings: api_saveSettings, api_resyncAll: api_resyncAll,
     api_adminStatus: api_adminStatus, api_adminTest: api_adminTest
   };
@@ -135,7 +146,8 @@ function api_getAll(token) {
     gmailAdvanced: gmailAdvanced_(),
     me: me,
     profils: readAll_(SHEET_PROFILS, PROFIL_FIELDS, 'photo'), // photos envoyées ensuite par api_getPhotos
-    echanges: readAll_(SHEET_ECHANGES, ECHANGE_FIELDS)
+    echanges: readAll_(SHEET_ECHANGES, ECHANGE_FIELDS),
+    posts: readAll_(SHEET_POSTS, POST_FIELDS)
   };
 }
 
@@ -171,6 +183,7 @@ function api_deleteProfil(token, id) {
     const errors = [];
     if (p) errors.push.apply(errors, syncItems_(p.syncIds, {}, p.id, false).errors);
     errors.push.apply(errors, clearEchangesOf_(id));
+    errors.push.apply(errors, detachPostsOf_(id));
     deleteById_(SHEET_PROFILS, PROFIL_FIELDS, id);
     log_(errors.length ? 'erreur' : 'info', me.name, 'Fiche supprimée', (p ? shortName_(p) : id) + (errors.length ? ' / ' + errors.join(' ') : ''));
     return { ok: true, _warn: errors.join(' ') };
@@ -184,6 +197,7 @@ function api_retirerConsentement(token, id) {
     if (!current) throw new Error('Profil introuvable.');
     const errors = syncItems_(current.syncIds, {}, id, false).errors; // annule tous les rendez-vous
     errors.push.apply(errors, clearEchangesOf_(id));
+    errors.push.apply(errors, detachPostsOf_(id));
     const kept = {};
     PROFIL_FIELDS.forEach(function (f) { kept[f] = KEEP_ON_WITHDRAW.indexOf(f) > -1 ? current[f] : ''; });
     kept.prenom = 'Profil';
@@ -317,6 +331,7 @@ function api_saveSettings(token, input) {
     inviteGmail: input.inviteGmail === 'oui' ? 'oui' : 'non',
     gmailEmail: String(input.gmailEmail || '').trim(),
     relances: input.relances === 'oui' ? 'oui' : 'non',
+    posts: input.posts === 'non' ? 'non' : 'oui',
     expediteur: String(input.expediteur || '').trim() || DEFAULT_SETTINGS.expediteur,
     replyTo: String(input.replyTo || '').trim(),
     signature: String(input.signature || '').trim()
@@ -356,6 +371,11 @@ function resyncAll_(force) {
     readAll_(SHEET_ECHANGES, ECHANGE_FIELDS).forEach(function (e) {
       const res = syncItems_(e.syncIds, echangeEvents_(e, byId[e.profilId]), e.id, !!force);
       if (res.raw !== e.syncIds) { e.syncIds = res.raw; upsert_(SHEET_ECHANGES, ECHANGE_FIELDS, e); count++; }
+      errors.push.apply(errors, res.errors);
+    });
+    readAll_(SHEET_POSTS, POST_FIELDS).forEach(function (t) {
+      const res = syncItems_(t.syncIds, postEvents_(t, byId[t.profilId]), t.id, !!force);
+      if (res.raw !== t.syncIds) { t.syncIds = res.raw; upsert_(SHEET_POSTS, POST_FIELDS, t); count++; }
       errors.push.apply(errors, res.errors);
     });
     return { count: count, errors: unique_(errors) };
@@ -499,7 +519,7 @@ function api_setup(code, login, name, password) {
   });
 }
 
-function api_login(login, password) {
+function api_login(login, password, remember) {
   login = String(login || '').trim().toLowerCase();
   checkLock_(login);
   const users = users_();
@@ -514,12 +534,17 @@ function api_login(login, password) {
     const fresh = users_();
     if (fresh[login]) { fresh[login].lastLogin = new Date().toISOString(); saveUsers_(fresh); }
   });
-  log_('info', u.name, 'Connexion', login);
-  return { token: newSession_(login), mustChange: !!u.mustChange };
+  log_('info', u.name, remember ? 'Connexion (30 jours)' : 'Connexion', login);
+  const token = newSession_(login);
+  if (remember) saveLongSession_(token, login);
+  return { token: token, mustChange: !!u.mustChange };
 }
 
 function api_logout(token) {
-  if (token) CacheService.getScriptCache().remove('sess_' + token);
+  if (token) {
+    CacheService.getScriptCache().remove('sess_' + token);
+    PropertiesService.getScriptProperties().deleteProperty('lsess_' + token);
+  }
   return true;
 }
 
@@ -534,6 +559,7 @@ function api_changePassword(token, current, next) {
     Object.assign(u, cred_(next));
     delete u.mustChange;
     saveUsers_(users);
+    dropLongSessions_(me.login, token); // les autres appareils devront se reconnecter
     log_('info', me.name, wasTemp ? 'Mot de passe personnel choisi' : 'Mot de passe changé', me.login);
     return true;
   });
@@ -573,6 +599,7 @@ function api_setUserActive(token, login, active) {
     if (login === me.login && !active) throw new Error('Tu ne peux pas désactiver ton propre compte.');
     users[login].active = !!active;
     saveUsers_(users);
+    if (!active) dropLongSessions_(login, '');
     log_('info', me.name, active ? 'Compte réactivé' : 'Compte désactivé', login);
     return true;
   });
@@ -586,6 +613,7 @@ function api_resetUserPassword(token, login, password) {
     Object.assign(users[login], cred_(password));
     users[login].mustChange = login !== me.login;
     saveUsers_(users);
+    dropLongSessions_(login, login === me.login ? token : '');
     log_('info', me.name, 'Mot de passe réinitialisé', login);
     return true;
   });
@@ -598,6 +626,7 @@ function api_deleteUser(token, login) {
     if (login === me.login) throw new Error('Tu ne peux pas supprimer ton propre compte.');
     delete users[login];
     saveUsers_(users);
+    dropLongSessions_(login, '');
     log_('info', me.name, 'Compte supprimé', login);
     return true;
   });
@@ -666,6 +695,7 @@ function api_resetWithCode(login, code, password) {
     u.lastLogin = new Date().toISOString();
     saveUsers_(users);
     cache.remove('reset_' + login);
+    dropLongSessions_(login, '');
     log_('info', u.name, 'Mot de passe réinitialisé par code', login);
     return { token: newSession_(login) };
   });
@@ -682,15 +712,46 @@ function reinitialiserAcces() {
 
 function guard_(token, allowTemp) {
   const cache = CacheService.getScriptCache();
-  const login = token ? cache.get('sess_' + token) : null;
+  let login = token ? cache.get('sess_' + token) : null;
+  if (!login && token) login = readLongSession_(token); // session de 30 jours, au-delà des 6 h du cache
   const u = login ? users_()[login] : null;
   if (!u || !u.active) {
-    if (token) cache.remove('sess_' + token);
+    if (token) { cache.remove('sess_' + token); PropertiesService.getScriptProperties().deleteProperty('lsess_' + token); }
     throw new Error('SESSION_EXPIREE');
   }
   cache.put('sess_' + token, login, SESSION_SECONDS);
   if (u.mustChange && !allowTemp) throw new Error('MDP_A_CHANGER');
   return { login: login, name: u.name, email: u.email || '', admin: ADMIN_LOGINS.indexOf(login) > -1 };
+}
+
+/** Session longue : conservée dans les propriétés du script, valable 30 jours après la connexion. */
+function saveLongSession_(token, login) {
+  const props = PropertiesService.getScriptProperties();
+  const now = Date.now();
+  // Ménage : supprime les sessions longues expirées.
+  const all = props.getProperties();
+  Object.keys(all).forEach(function (k) {
+    if (k.indexOf('lsess_') === 0) { const v = parseJson_(all[k]); if (!v.exp || v.exp < now) props.deleteProperty(k); }
+  });
+  props.setProperty('lsess_' + token, JSON.stringify({ login: login, exp: now + LONG_SESSION_DAYS * 86400000 }));
+}
+
+function readLongSession_(token) {
+  const props = PropertiesService.getScriptProperties();
+  const v = parseJson_(props.getProperty('lsess_' + token));
+  if (!v.login) return null;
+  if (!v.exp || v.exp < Date.now()) { props.deleteProperty('lsess_' + token); return null; }
+  return v.login;
+}
+
+/** Ferme toutes les sessions longues d'un compte (changement ou réinitialisation de mot de passe). */
+function dropLongSessions_(login, keepToken) {
+  const props = PropertiesService.getScriptProperties();
+  const all = props.getProperties();
+  Object.keys(all).forEach(function (k) {
+    if (k.indexOf('lsess_') !== 0 || k === 'lsess_' + keepToken) return;
+    if (parseJson_(all[k]).login === login) props.deleteProperty(k);
+  });
 }
 
 function newSession_(login) {
@@ -796,6 +857,78 @@ function profilEvents_(p) {
       title: 'Guérim : mise en ligne, ' + (ep ? ep + ' (' + who + ')' : who), desc: desc, lieu: '' };
   }
   return out;
+}
+
+const RESEAUX = { instagram: 'Instagram', facebook: 'Facebook', linkedin: 'LinkedIn', tiktok: 'TikTok', youtube: 'YouTube', x: 'X' };
+
+/** Post réseaux : rappel dans les agendas tant qu'il n'est pas publié. Titre neutre, prénom et initiale seulement. */
+function postEvents_(t, p) {
+  const s = getSettings_();
+  if (s.posts === 'non' || t.statut === 'publie' || !validDate_(t.date)) return {};
+  const nets = String(t.reseaux || '').split(',').map(function (k) { return RESEAUX[k] || ''; }).filter(String).join(', ');
+  const who = p && p.consentement !== 'retire' ? shortName_(p) : '';
+  return {
+    post: { date: t.date, heure: validTime_(t.heure) ? t.heure : '', dur: 15,
+      title: 'Guérim : post ' + (nets || 'réseaux') + (t.sujet ? ', ' + t.sujet : '') + (who ? ' (' + who + ')' : ''),
+      desc: (t.texte ? String(t.texte).slice(0, 1500) + '\n\n' : '') + 'CRM : ' + appUrl_(), lieu: '' }
+  };
+}
+
+function api_savePost(token, t) {
+  const me = guard_(token);
+  return withLock_(function () {
+    const clean = pick_(t, POST_FIELDS);
+    if (!validDate_(clean.date)) throw new Error('Indique la date de publication.');
+    if (!clean.sujet && !clean.texte) throw new Error('Indique au moins un sujet ou un texte.');
+    if (!validTime_(clean.heure)) clean.heure = '';
+    clean.reseaux = clean.reseaux.split(',').filter(function (k) { return RESEAUX[k]; }).join(',');
+    clean.statut = clean.statut === 'publie' ? 'publie' : 'a_faire';
+    const prev = clean.id ? findObj_(SHEET_POSTS, POST_FIELDS, clean.id) : null;
+    const now = new Date().toISOString();
+    if (!clean.id) { clean.id = Utilities.getUuid(); clean.createdAt = now; }
+    clean.updatedAt = now;
+    clean.auteur = prev ? prev.auteur : me.name;
+    clean.syncIds = prev ? prev.syncIds : '';
+    upsert_(SHEET_POSTS, POST_FIELDS, clean);
+    return clean; // la synchronisation agenda suit via api_syncPost
+  });
+}
+
+function api_syncPost(token, id) {
+  const me = guard_(token);
+  return withLock_(function () {
+    const t = findObj_(SHEET_POSTS, POST_FIELDS, id);
+    if (!t) return { syncIds: '', _warn: '' };
+    const p = t.profilId ? findObj_(SHEET_PROFILS, PROFIL_FIELDS, t.profilId) : null;
+    const res = syncItems_(t.syncIds, postEvents_(t, p), t.id, false);
+    if (res.raw !== t.syncIds) { t.syncIds = res.raw; upsert_(SHEET_POSTS, POST_FIELDS, t); }
+    if (res.errors.length) log_('erreur', me.name, 'Synchronisation post', (t.sujet || t.date) + ' / ' + res.errors.join(' '));
+    return { syncIds: t.syncIds, _warn: res.errors.join(' ') };
+  });
+}
+
+/** Retrait ou suppression d'un invité : ses posts restent, mais sans lien ni nom dans les agendas. */
+function detachPostsOf_(profilId) {
+  const errors = [];
+  readAll_(SHEET_POSTS, POST_FIELDS).forEach(function (t) {
+    if (t.profilId !== profilId) return;
+    t.profilId = '';
+    const res = syncItems_(t.syncIds, postEvents_(t, null), t.id, false);
+    t.syncIds = res.raw;
+    errors.push.apply(errors, res.errors);
+    upsert_(SHEET_POSTS, POST_FIELDS, t);
+  });
+  return errors;
+}
+
+function api_deletePost(token, id) {
+  guard_(token);
+  return withLock_(function () {
+    const t = findObj_(SHEET_POSTS, POST_FIELDS, id);
+    const errors = t ? syncItems_(t.syncIds, {}, t.id, false).errors : [];
+    deleteById_(SHEET_POSTS, POST_FIELDS, id);
+    return { ok: true, _warn: errors.join(' ') };
+  });
 }
 
 function echangeEvents_(e, p) {
