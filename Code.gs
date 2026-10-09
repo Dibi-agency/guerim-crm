@@ -10,11 +10,12 @@
  * v3.7 : point d'accès doPost pour l'application installable (PWA hébergée sur GitHub Pages).
  * v3.8 : option « Rester connecté 30 jours » sur l'appareil.
  * v3.9 : posts réseaux sociaux planifiés dans l'agenda.
+ * v3.10 : gestion des comptes réservée aux administrateurs.
  * Données stockées dans un Google Sheets privé, créé automatiquement
  * dans le Drive du compte qui déploie l'application.
  */
 
-const APP_VERSION = '3.9.0 (2026-10-08)';
+const APP_VERSION = '3.10.0 (2026-10-09)';
 
 const SHEET_PROFILS = 'Profils';
 const SHEET_ECHANGES = 'Echanges';
@@ -23,7 +24,7 @@ const JOURNAL_FIELDS = ['date', 'niveau', 'utilisateur', 'action', 'detail'];
 const JOURNAL_MAX = 3000; // au-delà, les plus anciennes lignes sont effacées
 
 // Identifiants qui voient l'espace Administration. Modifiable uniquement ici, jamais depuis l'interface.
-const ADMIN_LOGINS = ['demphis'];
+const ADMIN_LOGINS = ['demphis', 'caroline'];
 
 const PROFIL_FIELDS = [
   'id', 'createdAt', 'updatedAt',
@@ -566,16 +567,16 @@ function api_changePassword(token, current, next) {
 }
 
 function api_listUsers(token) {
-  const me = guard_(token);
+  const me = adminGuard_(token);
   const users = users_();
   return Object.keys(users).map(function (login) {
     const u = users[login];
-    return { login: login, name: u.name, email: u.email || '', active: u.active, lastLogin: u.lastLogin || '', mustChange: !!u.mustChange, createdAt: u.createdAt || '', createdBy: u.createdBy || '', isMe: login === me.login };
+    return { login: login, name: u.name, email: u.email || '', admin: ADMIN_LOGINS.indexOf(login) > -1, active: u.active, lastLogin: u.lastLogin || '', mustChange: !!u.mustChange, createdAt: u.createdAt || '', createdBy: u.createdBy || '', isMe: login === me.login };
   }).sort(function (a, b) { return a.name.localeCompare(b.name, 'fr'); });
 }
 
 function api_addUser(token, login, name, password, email) {
-  const me = guard_(token);
+  const me = adminGuard_(token);
   return withLock_(function () {
     const users = users_();
     login = normLogin_(login);
@@ -591,8 +592,14 @@ function api_addUser(token, login, name, password, email) {
   });
 }
 
+/** Les comptes administrateurs (ADMIN_LOGINS) ne se gèrent pas entre eux : chacun garde la main sur le sien. */
+function protectAdmin_(me, login) {
+  if (login !== me.login && ADMIN_LOGINS.indexOf(login) > -1) throw new Error("Ce compte est administrateur : seul son titulaire peut le modifier.");
+}
+
 function api_setUserActive(token, login, active) {
-  const me = guard_(token);
+  const me = adminGuard_(token);
+  protectAdmin_(me, login);
   return withLock_(function () {
     const users = users_();
     if (!users[login]) throw new Error('Compte introuvable.');
@@ -606,7 +613,8 @@ function api_setUserActive(token, login, active) {
 }
 
 function api_resetUserPassword(token, login, password) {
-  const me = guard_(token);
+  const me = adminGuard_(token);
+  protectAdmin_(me, login);
   return withLock_(function () {
     const users = users_();
     if (!users[login]) throw new Error('Compte introuvable.');
@@ -620,7 +628,8 @@ function api_resetUserPassword(token, login, password) {
 }
 
 function api_deleteUser(token, login) {
-  const me = guard_(token);
+  const me = adminGuard_(token);
+  protectAdmin_(me, login);
   return withLock_(function () {
     const users = users_();
     if (login === me.login) throw new Error('Tu ne peux pas supprimer ton propre compte.');
